@@ -1,6 +1,6 @@
 ---
 name: powershell-text-editing
-description: Use when working with text-based files on powershell CLI
+description: Use for all PowerShell shell work: reading, searching, and precisely editing text and code files with regex and pipeline
 ---
 
 # Working with Text Files in PowerShell on Windows

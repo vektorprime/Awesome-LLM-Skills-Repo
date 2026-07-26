@@ -1,6 +1,7 @@
 ---
 name: bash-cli-text-editing
-description: Use when working with text-based files on Linux bash CLI
+description: Use this skill whenever running bash or shell commands, working in the
+  terminal/CLI, or editing and transforming text and code files (On Linux).
 ---
 
 # Working with Text Files on the Bash CLI (Linux)
