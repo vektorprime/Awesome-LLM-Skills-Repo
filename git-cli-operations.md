@@ -1,6 +1,6 @@
 ---
 title: Git CLI Operations
-description: Read this before working on anything git related.  : Complete operational reference for safely managing local and remote Git repositories hosted on github.com via git and gh CLI.
+description: Read this before working on anything git related. Complete operational reference for safely managing local and remote Git repositories hosted on github.com via git and gh CLI.
 
 ---
 
