@@ -1,7 +1,7 @@
 ---
 name: blender-mcp
 description: >-
-  Read this skill when working with blender mcp. Expert Blender 4.5 LTS skill for agents controlling Blender through MCP. Use for advanced 3D modeling,
+  Always read this skill when working with blender MCP. Expert Blender 4.5 LTS skill for agents controlling Blender through MCP. Use for advanced 3D modeling,
   procedural geometry, Geometry Nodes, hard-surface and organic assets, materials, UVs, lighting,
   cameras, animation, rigging, physics, rendering, external asset integration, validation, repair, and
   export. Emphasizes deterministic Blender Python, scene preservation, version-aware API introspection,
@@ -342,7 +342,7 @@ Load these if you think any of them will be relevant:
   introspection, failure recovery, export discipline, completion criteria, and MCP-specific operating practices.
 - [Advanced worked examples](references/examples.md) — precision gear, detailed sci-fi crate, Geometry Nodes
   rivet scatter, product shot, and additional modeling recipes.
-- [Environment, organic, water, and simulation examples](references/environment-organic-examples.md) — detailed feather/plumage construction, multi-scale terrain, Gerstner water, rivers, biome scatter, rocks/cliffs, volumes, cloth, vines, accumulation, waterfalls, smoke/fire, and full environment assembly.
+Environment, organic, water, and simulation examples — detailed feather/plumage construction, production fur grooms, multi-scale terrain, Gerstner water, rivers, biome scatter, rocks/cliffs, volumes, cloth, vines, accumulation, waterfalls, smoke/fire, and full environment assembly.
 
 Executable examples are also available in `scripts/`:
 

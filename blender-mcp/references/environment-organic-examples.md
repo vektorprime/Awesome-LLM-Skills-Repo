@@ -1029,6 +1029,544 @@ Check for:
 
 ---
 
+## Example N - Production Fur Groom with Hair Curves and Geometry Nodes
+
+### Goal
+
+Create convincing short-to-medium animal fur that reads correctly in silhouette, follows anatomy, survives close lighting, remains editable, and can be scaled from an interactive viewport groom to dense render fur.
+
+Do not treat fur as "many straight lines normal to the surface." Believable fur usually contains several interacting signals:
+
+- a directional groom driven by anatomy and gravity;
+- region-specific length and density;
+- a sparse set of art-directable guide curves;
+- interpolated render hairs rather than hand-editing every strand;
+- root lift and tip laydown;
+- clumping at more than one scale;
+- controlled frizz/noise;
+- random length variation that preserves the overall coat shape;
+- tapered strand radius;
+- color and roughness variation;
+- special transition zones around eyes, nose, mouth, paws, ears, and joints;
+- a separate treatment for whiskers, guard hairs, mane tufts, or undercoat when required.
+
+The correct production pattern is usually:
+
+**SURFACE -> GUIDES -> GROOM -> INTERPOLATE -> LENGTH/DENSITY MASKS -> CLUMP -> NOISE -> PROFILE -> SHADE -> VALIDATE**
+
+### Choose the fur representation deliberately
+
+Use Blender Hair Curves when:
+
+- the fur must be groomable;
+- the surface may deform or animate;
+- individual strand direction matters;
+- close shots need actual strand silhouettes;
+- Geometry Nodes should generate or interpolate render hairs.
+
+Use instanced cards/shells when:
+
+- the asset is distant;
+- the target is real-time/game rendering;
+- alpha cards are an accepted part of the pipeline;
+- full curve density would be wasteful.
+
+Use shader-only fuzz when:
+
+- the fibers are microscopic relative to the camera;
+- the silhouette does not need visible strands;
+- the goal is peach fuzz, velvet, suede, or a very distant coat.
+
+For hero creatures, a hybrid is common: actual hair curves for silhouette/guard hairs and cheaper micro-fuzz or material breakup beneath them.
+
+### Blender 4.5 attachment requirements
+
+For a deformable Hair Curves workflow, establish attachment correctly before building density.
+
+Important Blender 4.5 rules:
+
+- `Generate Hair Curves` requires a Surface and Surface UV Map.
+- `Interpolate Hair Curves` also requires a Surface and Surface UV Map.
+- attached/deforming curves use the curve-domain `surface_uv_coordinate` 2D-vector attribute to describe root locations on the surface UV map;
+- `Deform Curves on Surface` expects a hair-curves object with a valid surface relationship and attachment data;
+- if the body topology or UVs change after grooming, attachment may need to be refreshed;
+- if a Subdivision Surface modifier is part of the deformation chain, verify UV smoothing behavior before assuming root UVs remain valid.
+
+Do not generate a dense final coat until a small guide set visibly follows the animated/deformed surface.
+
+### Stage 1 - Prepare the body or scalp surface
+
+The fur surface should be clean and predictable.
+
+Check:
+
+- real-world scale;
+- applied or intentionally managed transforms;
+- outward-facing normals;
+- usable UV map;
+- no accidental duplicate faces;
+- no impossible self-intersections in the areas that will be groomed;
+- a deformation stack that is stable enough to bind hair to.
+
+For complex creatures, consider a dedicated scalp/body proxy mesh that follows the render body but has simpler topology. A proxy can make attachment, painting, and procedural sampling more stable.
+
+Create named masks instead of burying every decision inside one node graph. Useful masks include:
+
+- `fur_density`;
+- `fur_length`;
+- `fur_clump`;
+- `fur_frizz`;
+- `fur_wetness`;
+- `fur_guard_hair`;
+- `fur_bald`;
+- `fur_color_region`.
+
+These can be vertex/color attributes, textures sampled through UVs, or fields derived from position, normals, named selections, or proximity.
+
+### Stage 2 - Establish anatomical flow before density
+
+The guide groom is more important than the final strand count.
+
+For a quadruped-like body, a useful starting logic is:
+
+- top of skull: flow backward from forehead toward neck;
+- cheeks: flow backward and slightly downward;
+- neck: transition toward shoulder/chest direction;
+- torso: flow from front toward rear, with a downward component on the flanks;
+- belly: shorter, softer, and often more downward;
+- limbs: flow toward paws/hooves rather than radially away from the limb;
+- tail: flow from base toward tip;
+- ears: short edge-aware fur, often with longer interior tufts;
+- around eyes/nose/lips: density and length reduced strongly;
+- joints: flow should bend around the form rather than form starburst patterns.
+
+A normal-only groom tends to look like a bottle brush. The guide tangent should usually include a strong surface-tangent component.
+
+A procedural tangent can be built conceptually as:
+
+```python
+flow = Vector((-1.0, 0.0, -0.15)).normalized()
+tangent = flow - normal * flow.dot(normal)
+if tangent.length > 1e-6:
+    tangent.normalize()
+direction = (normal * root_lift + tangent * lay_direction).normalized()
+```
+
+The exact world direction is asset-dependent. For a creature, prefer object/local-space controls or painted vector fields over a hard-coded global axis.
+
+### Stage 3 - Create sparse guides
+
+Start with enough guides to describe the coat, not enough to render it.
+
+A practical guide set should capture:
+
+- silhouette changes;
+- cowlicks;
+- parts;
+- mane direction;
+- cheek/chest tufts;
+- tail flow;
+- transitions around joints;
+- areas where clumps must not bleed across a boundary.
+
+For a stylized medium creature, a few hundred carefully distributed guides can be more useful than tens of thousands of uncontrolled strands. For a large realistic hero groom, the guide count may be substantially higher, but the same rule applies: every extra guide should add useful shape information.
+
+Validate guides in solid and material preview before interpolation. From the intended camera, ask:
+
+- does the outer coat silhouette already feel correct?
+- do the tips lean in the right direction?
+- are there obvious radial spikes?
+- do parts/cowlicks read from a distance?
+- are bald zones respected?
+
+If the guide groom is wrong, increasing density will make the wrong groom more expensive.
+
+### Stage 4 - Generate or interpolate render fur
+
+Use `Generate Hair Curves` when the coat can be generated procedurally from the surface and does not need existing guides to drive its shape.
+
+Use `Interpolate Hair Curves` when a sparse guide groom already defines the shape and the final coat should inherit that structure.
+
+For a guide-driven hero coat, a useful Geometry Nodes logic is conceptually:
+
+```text
+Guide Hair Curves
+    -> Interpolate Hair Curves
+       Surface = body/scalp
+       Surface UV Map = body UV
+       Density / Density Mask = fur_density
+       Viewport Amount = reduced during lookdev
+    -> Trim Hair Curves / length shaping
+    -> Clump Hair Curves
+    -> Hair Curves Noise
+    -> Set Hair Curve Profile
+    -> Set Material
+    -> Group Output
+```
+
+The exact node order is art-dependent. For example, coarse clumping before fine noise usually gives more coherent tufts than applying strong noise before clump formation.
+
+Do not use final render density in every MCP iteration. Expose or preserve a viewport-density control.
+
+### Stage 5 - Length design
+
+Uniform length is one of the fastest ways to make fur look synthetic.
+
+Construct length from several terms:
+
+```text
+final_length = base_length
+             * region_length_mask
+             * macro_variation
+             * micro_random_variation
+             * grooming_adjustment
+```
+
+Useful design patterns:
+
+- muzzle and eye surround: very short;
+- cheeks: medium with directional lay;
+- neck/chest: longer and often more tufted;
+- spine: medium/long guard hairs;
+- belly: soft shorter undercoat;
+- joints/paws: controlled shorter fibers;
+- tail: progressively longer or regionally stylized;
+- ear interior: sparse longer hairs layered over short fur.
+
+`Trim Hair Curves` can scale or replace curve length and can add randomized trimming. Use random length sparingly; preserve a readable outer coat shape.
+
+### Stage 6 - Clumping at multiple scales
+
+Real coats rarely behave as independent evenly spaced strands.
+
+Think in at least two clump frequencies:
+
+1. macro clumps/tufts that affect silhouette and large highlight breakup;
+2. micro clumps that keep local strands from looking uniformly combed.
+
+A robust pattern is:
+
+```text
+Interpolated fur
+    -> broad Clump Hair Curves
+    -> subtle secondary clump/noise
+    -> tip breakup
+```
+
+With `Clump Hair Curves`, expose controls for:
+
+- factor;
+- guide distance;
+- guide mask;
+- tip spread;
+- clump offset;
+- distance falloff;
+- seed;
+- preserve length.
+
+Do not clump across anatomical boundaries such as a hard hair part, different material region, or opposite-flow cheek patches. Use masks or guide groups to preserve those separations.
+
+### Stage 7 - Frizz, waviness, and strand imperfection
+
+Use `Hair Curves Noise` for controlled irregularity. Useful controls include factor, distance, scale, scale along curve, per-curve offset, seed, and preserve length.
+
+For short fur:
+
+- keep noise amplitude small relative to strand length;
+- bias irregularity toward mid/tip regions;
+- preserve a clean root so the coat appears attached;
+- avoid high-frequency noise that reads as zig-zag wire.
+
+For wool, curly coats, or stylized tufts, `Curl Hair Curves` can add structured curls using guide relationships. Use it intentionally rather than applying curl uniformly to every region.
+
+A production coat often layers variation:
+
+```text
+large directional groom
++ subtle broad bend variation
++ clump structure
++ fine frizz
++ sparse longer guard hairs
+```
+
+### Stage 8 - Strand radius and taper
+
+Fur needs visible taper, especially in close light.
+
+Use `Set Hair Curve Profile` or a point-domain `radius` attribute so strands are thicker near the root and approach a much smaller tip radius.
+
+The actual radius must match scene scale. Do not use a generic `0.01` radius on every asset.
+
+For a medium animal measured in meters, a stylized close-up might use a visibly exaggerated root radius on the order of fractions of a millimeter to a few millimeters depending on art style, while realistic fine undercoat may need much thinner values.
+
+Validate radius in the actual render engine. Viewport curve display can differ from final rendered strand appearance.
+
+### Stage 9 - Guard hairs and undercoat as separate systems
+
+Do not force every strand into one statistical distribution.
+
+A stronger coat often uses two or three systems:
+
+**Undercoat**
+
+- dense;
+- short;
+- soft;
+- low noise amplitude;
+- small radius;
+- strong role in volume/color fill.
+
+**Main coat**
+
+- medium density;
+- primary groom direction;
+- clear clumping;
+- moderate variation.
+
+**Guard hairs**
+
+- sparse;
+- longer;
+- slightly thicker;
+- more silhouette influence;
+- more visible color variation;
+- may have a separate material or color attribute.
+
+Whiskers should normally be their own curves with a completely different radius, stiffness, root placement, and count.
+
+### Stage 10 - Fur color and shader design
+
+Prefer a hair-capable shader for strand rendering. A good fur shader should support:
+
+- base color;
+- root-to-tip variation;
+- region masks;
+- individual-strand random variation;
+- roughness/specular response appropriate to the animal/material;
+- optional melanin-style or direct color workflow depending on the desired look.
+
+Do not make every strand exactly the same RGB value.
+
+Useful color construction:
+
+```text
+region base color
++ subtle per-curve random color
++ root/tip gradient
++ sparse guard-hair variation
++ optional wetness/dirt modulation
+```
+
+Keep random color subtle unless the animal pattern demands obvious mottling.
+
+For wet fur:
+
+- reduce apparent volume;
+- increase clumping;
+- darken/alters roughness as appropriate;
+- make strands lie closer to the surface;
+- expose more skin/body form between clumps.
+
+Wet fur is not dry fur with only a darker shader.
+
+### Stage 11 - Geometry Nodes architecture for an editable coat
+
+For a reusable agent-built setup, prefer small named node groups rather than one enormous graph.
+
+Suggested groups:
+
+- `MCP_Fur_Distribution`;
+- `MCP_Fur_Length`;
+- `MCP_Fur_GroomVariation`;
+- `MCP_Fur_Clump`;
+- `MCP_Fur_Profile`;
+- `MCP_Fur_MaterialVariation`.
+
+Expose high-value controls on the modifier interface:
+
+- Density;
+- Viewport Density;
+- Base Length;
+- Length Variation;
+- Root Lift;
+- Lay Strength;
+- Clump Amount;
+- Clump Scale;
+- Frizz Amount;
+- Frizz Scale;
+- Root Radius;
+- Tip Radius;
+- Seed.
+
+Do not expose dozens of low-level sockets unless the user is building a technical rig. A strong procedural asset exposes art controls, not implementation clutter.
+
+### Stage 12 - Performance and LOD
+
+Dense fur can become one of the heaviest systems in a scene.
+
+Use these controls deliberately:
+
+- lower viewport amount while grooming;
+- keep guide count much lower than render hair count;
+- reduce control points per strand where curvature does not need them;
+- use Duplicate Hair Curves instead of expensive interpolation when its simpler behavior is sufficient;
+- avoid unnecessary realized curve/mesh conversion;
+- reduce off-camera fur density if the final shot permits it;
+- separate hero/head fur from body fur if different quality levels are needed;
+- hide or simplify fur in diagnostic modeling views;
+- test render small crops before full-frame final rendering.
+
+Do not convert millions of hairs to mesh merely to make them "more real." Keep them as curves unless a downstream requirement forces conversion.
+
+### Stage 13 - Animation and deformation
+
+For an animated character, validate attachment before final lookdev.
+
+Test at least:
+
+- neutral pose;
+- extreme neck turn;
+- compressed shoulder/hip pose;
+- jaw/face deformation if facial fur exists;
+- tail bend;
+- ear deformation.
+
+Watch for:
+
+- roots sliding across UVs;
+- strands penetrating the body;
+- clumps flipping orientation;
+- large volume changes from subdivision/deformation;
+- fur crossing parts that should stay separated.
+
+For secondary motion, add dynamics only after the base deformation is correct. Short body fur may need little or no simulated motion, while a mane, tail tuft, or long belly fur may justify dedicated dynamics.
+
+### Stage 14 - MCP construction sequence
+
+A reliable Blender-MCP fur task should be staged approximately like this:
+
+```text
+1. Inspect the body object, dimensions, modifiers, UV maps, and existing materials.
+2. Screenshot the unfurred body from the intended camera and a diagnostic side view.
+3. Create/reuse an MCP-owned Fur collection and, if needed, a scalp proxy.
+4. Create a low-count guide Hair Curves object attached to the surface.
+5. Establish broad anatomical groom direction.
+6. Screenshot guides before generating dense fur.
+7. Add interpolation/generation at low viewport density.
+8. Add length masks and verify facial/joint/bald zones.
+9. Add primary clumping.
+10. Add restrained noise/frizz and tip variation.
+11. Set strand profile/radius.
+12. Assign and tune the fur material.
+13. Inspect close, medium, and silhouette screenshots/renders.
+14. Test one deformed pose if the surface is animated.
+15. Increase render density only after the coat is visually correct.
+16. Print compact diagnostics and leave controls/names organized.
+```
+
+Do not combine all sixteen stages into one giant `execute_blender_code` call.
+
+### Stage 15 - Compact validation script
+
+When a hair-curves object exists, use a compact inspection pass instead of printing every strand:
+
+```python
+import bpy
+
+name = "MCP_Fur"
+obj = bpy.data.objects.get(name)
+
+if obj is None:
+    print({"ok": False, "reason": "missing", "name": name})
+elif obj.type != 'CURVES':
+    print({"ok": False, "reason": "wrong_type", "type": obj.type})
+else:
+    curves = obj.data
+    attrs = {a.name: (a.data_type, a.domain) for a in curves.attributes}
+    print({
+        "ok": True,
+        "name": obj.name,
+        "type": obj.type,
+        "curve_count": len(curves.curves),
+        "point_count": len(curves.points),
+        "surface": curves.surface.name if curves.surface else None,
+        "surface_uv_map": curves.surface_uv_map,
+        "has_surface_uv_coordinate": "surface_uv_coordinate" in attrs,
+        "has_radius": "radius" in attrs,
+        "materials": [m.name if m else None for m in curves.materials],
+        "modifiers": [(m.name, m.type) for m in obj.modifiers],
+    })
+```
+
+For an attached animated groom, also inspect that `surface_uv_coordinate` is present on the curve domain and that the referenced Surface UV Map still exists on the surface mesh.
+
+### Stage 16 - Common fur failures and fixes
+
+**Bottle-brush fur**
+
+Cause: strands follow only surface normals.
+
+Fix: introduce a strong tangent groom and art-directed guide flow.
+
+**Fur looks like grass**
+
+Cause: uniform length, uniform radius, upright direction, no clumping.
+
+Fix: lower root lift, add lay direction, regional length, taper, clumps, and undercoat/guard-hair separation.
+
+**Fur explodes away from the body**
+
+Cause: root positions, surface transform, UV attachment, or deformation relationship is wrong.
+
+Fix: validate surface object, transforms, UV map, and root attachment before increasing density.
+
+**Hair slides during animation**
+
+Cause: attachment data/UV assumptions are invalid after topology/modifier changes.
+
+Fix: stabilize the body/scalp topology and UVs; refresh/rebuild attachment as needed; validate `surface_uv_coordinate` and deformation order.
+
+**Black/noisy render patches**
+
+Cause: extreme strand density, bad material response, too-large radii, insufficient samples, or intersecting/degenerate curves.
+
+Fix: test a cropped render with lower density, inspect radii, material, curve shape settings, and malformed strands separately.
+
+**Clumps merge across a hair part**
+
+Cause: clump guides/groups ignore anatomical regions.
+
+Fix: split guide groups or mask clump influence across the part.
+
+**Viewport becomes unusable**
+
+Cause: render density is being evaluated during every edit.
+
+Fix: expose Viewport Amount/density and keep it low until final validation.
+
+**Fur hides facial design**
+
+Cause: density/length masks were not treated as art-direction controls.
+
+Fix: shorten and thin fur around eyes, lips, nostrils, ear rims, and other high-information features.
+
+### Standalone procedural demo
+
+Use `../scripts/fur_generator.py` for a deterministic static fur demonstration. It creates an MCP-owned ellipsoidal body plus hundreds of tapered Hair Curves strands with:
+
+- approximately uniform surface sampling;
+- outward root lift;
+- backward/downward anatomical lay;
+- length variation;
+- tip bend/frizz;
+- point-domain radius taper;
+- a hair material;
+- compact printed diagnostics.
+
+The script intentionally demonstrates direct Curves datablock construction rather than pretending to be a full animated groom. For a deforming hero character, use the guide/interpolation/attachment workflow described above and validate surface UV attachment before final density.
+
+---
+
 # Reusable MCP Execution Pattern for Heavy Natural Scenes
 
 For a substantial environment, an agent should prefer a staged sequence like:
