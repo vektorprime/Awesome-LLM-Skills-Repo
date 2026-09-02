@@ -1,7 +1,7 @@
 ---
-name: blender-mcp-advanced
+name: blender-mcp
 description: >-
-  Expert Blender 4.5 LTS skill for agents controlling Blender through MCP. Use for advanced 3D modeling,
+  Read this skill when working with blender mcp. Expert Blender 4.5 LTS skill for agents controlling Blender through MCP. Use for advanced 3D modeling,
   procedural geometry, Geometry Nodes, hard-surface and organic assets, materials, UVs, lighting,
   cameras, animation, rigging, physics, rendering, external asset integration, validation, repair, and
   export. Emphasizes deterministic Blender Python, scene preservation, version-aware API introspection,
