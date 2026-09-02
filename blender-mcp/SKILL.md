@@ -55,6 +55,8 @@ For anything beyond a trivial primitive, follow:
 
 **OBSERVE -> PLAN -> EDIT -> VALIDATE -> VISUALLY INSPECT -> ITERATE**
 
+**MANDATORY: You MUST take screenshots from multiple angles before and after EVERY change, and you MUST validate EVERY change.** No change is considered complete until its before/after multi-angle screenshots have been captured and inspected and the change has been numerically validated.
+
 ### Observe
 
 Use available scene/object inspection tools to establish:
