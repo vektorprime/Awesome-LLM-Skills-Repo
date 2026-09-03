@@ -1,0 +1,13 @@
+set pagination off
+set confirm off
+set disassembly-flavor intel
+set logging file gdb.log
+set logging overwrite on
+set logging enabled on
+starti
+info files
+info proc mappings
+info registers
+x/16i $pc
+bt
+quit
