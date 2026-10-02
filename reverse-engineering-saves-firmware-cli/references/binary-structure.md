@@ -105,7 +105,7 @@ Width changes at 127→128 and 16383→16384 scream varint. Search, don't stare:
 
 ```bash
 python3 scripts/find_int.py S11.bin 128     # also tries ULEB128 + zigzag
-python3 scripts/find_int.py S11.bin --zigzag -5
+python3 scripts/find_int.py S11.bin --zigzag-only -5
 ```
 
 Formulas: ULEB128 = 7-bit groups, low first, high bit = continue.

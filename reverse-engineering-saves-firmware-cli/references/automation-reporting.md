@@ -41,8 +41,16 @@ clean:
 - Firmware: model/HW/version + repeated reads → outer package + sig/manifest
   preservation → layer ledger → partitions/entries → U-Boot/FIT/DTB →
   userspace FS → metadata/certs/config inventory → hash-vs-trust split →
-  4-layer version diff → code/hWN handoff by hash. Checklist:
+  4-layer version diff → code/HW handoff by hash. Checklist:
   `checklists/firmware.md`.
+- Save exploitation (authorized): spec done → loader attack-surface audit →
+  integrity ladder (none → checksum → MAC → signature) → edit pipeline
+  with reloaded/re-saved verification → loader-bug handoff package. Ref:
+  `save-exploitation.md` (uses `checklists/saved-game.md` for the base loop).
+- Firmware repack (authorized lab devices): rebuild map per layer →
+  recompute obligations inside-out → partition-resize discipline only if
+  unavoidable → QEMU-first → external-recovery/A-B ladder before any flash.
+  Ref: `firmware-repack-modify.md` (uses `checklists/firmware.md`).
 - Final gate for every case: `checklists/final.md`.
 
 Cheapest-decisive-test table:

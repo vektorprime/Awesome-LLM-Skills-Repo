@@ -25,7 +25,13 @@ def main() -> int:
         print("usage: sample_matrix_fill.py MATRIX.CSV SAMPLES_DIR", file=sys.stderr)
         return 2
     csv_path, sample_dir = Path(sys.argv[1]), Path(sys.argv[2])
-    rows = list(csv.DictReader(csv_path.open(newline="", encoding="utf-8")))
+    with csv_path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        rows = list(reader)
+    if not rows or not fieldnames or "sample" not in fieldnames:
+        print(f"no usable rows (need a 'sample' column) in {csv_path}", file=sys.stderr)
+        return 2
     for row in rows:
         cand = sample_dir / row["sample"]
         if not cand.exists():
@@ -39,7 +45,7 @@ def main() -> int:
         else:
             print(f"warning: no file for sample {row['sample']}", file=sys.stderr)
     with csv_path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=rows[0].keys())
+        w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()
         w.writerows(rows)
     print(f"updated {len(rows)} rows in {csv_path}")

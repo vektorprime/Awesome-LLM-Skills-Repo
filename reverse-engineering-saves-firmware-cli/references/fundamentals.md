@@ -28,13 +28,18 @@ savestates; console/handheld save containers; vendor firmware downloads;
 authorized hardware dumps; raw NAND/NOR/SPI/eMMC/partition images; U-Boot
 legacy + FIT; device tree blobs; SquashFS/CramFS/JFFS2/UBIFS/ext/FAT/CPIO/tar;
 proprietary headers, manifests, partition tables, checksums, signatures;
-compression, serialization, authorized modification.
+compression, serialization, authorized modification; authorized save-level
+exploitation (integrity bypass, edit pipeline, save-trigger workups —
+`saves-differential.md` and `save-exploitation.md`); authorized lab-device
+firmware rebuild/repack (`firmware-repack-modify.md`).
 
-Out of scope: disassembly, parser recovery from application code, signature
-bypass on deployed devices, exploits, unauthorized extraction, modifying
-signed firmware for production. You may inventory executables inside firmware
-(hash, compare) but stop before code analysis — hand off with exact hashes
-(see `automation-reporting.md`).
+Out of scope: parser recovery from application code and anything code-side
+of the loader (disassembly, hooking, exploit development against the
+application — hand off to the `reverse-engineering-executables` skill with
+exact hashes, see `automation-reporting.md`), signature bypass on deployed
+devices, unauthorized extraction, modifying signed firmware for production.
+You may inventory executables inside firmware (hash, compare) but stop
+before code analysis.
 
 ## 3. Evidence standard
 

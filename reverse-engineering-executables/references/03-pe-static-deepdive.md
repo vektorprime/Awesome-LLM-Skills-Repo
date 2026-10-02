@@ -33,7 +33,7 @@ What each field decides:
 - `Machine`: `0x8664`=x64, `0x14c`=x86, `0xaa64`=ARM64. Mismatch with `file` output → investigate.
 - `Characteristics`: `0x0002`=executable, `0x2000`=DLL. A `.exe` with DLL flag (or vice versa) is a red flag.
 - `Subsystem`: `2`=GUI, `3`=console, `1`=driver. GUI binary with console-only imports is odd.
-- `DllCharacteristics`: `0x0040`=ASLR, `0x0100`=NX, `0x4000`=CFG, `0x0080`=SEH. Absence affects debugging/exploitation, not malice.
+- `DllCharacteristics`: `0x0040`=DYNAMIC_BASE (ASLR), `0x0020`=HIGH_ENTROPY_VA (64-bit ASLR), `0x0100`=NX (DEP-compatible), `0x4000`=CFG (Control Flow Guard), `0x0080`=FORCE_INTEGRITY, `0x0400`=NO_SEH (structured exception handling disallowed). Absence affects debugging/exploitation, not malice.
 - `e_lfanew` at file offset `0x3C` (u32le). If it points past EOF → truncated/mangled.
 
 RVA → file offset conversion (required for manual carving):
@@ -57,7 +57,7 @@ dumpbin /HEADERS sample.exe > pe-headers.txt
 Checklist:
 
 - [ ] Entry-point RVA falls in executable section (usually `.text`)? If in `UPX1`/`.vmp`/`.rsrc` → packer (see `10-...`).
-- [ ] Any `W+X` (writable+executable, char `0xE0000020`+`0x80000000`)? Rare in clean MSVC; normal for packed/self-modifying.
+- [ ] Any `W+X` (writable+executable: `0x20000000` EXECUTE and `0x80000000` WRITE both set, e.g. char `0xE0000020`)? Rare in clean MSVC; normal for packed/self-modifying.
 - [ ] `RawSize=0` but `VirtualSize` large? Runtime-filled (unpacking, BSS-like).
 - [ ] `RawSize >> VirtualSize`? Overlay-smuggling or appended data.
 - [ ] Weird names (`.vmp0`, `.themida`, `UPX0/UPX1`, `.enigma`, single-char)? Packer/protector lead.
@@ -89,7 +89,7 @@ High-value families:
 Rules:
 
 - Correct spelling is `ws2_32.dll`. APIs forward via API sets (`api-ms-win-*`) and `KernelBase` — confirm resolved target in debugger, don't trust static name.
-- Delay imports (`dumpbin /IMPORTS` shows `Delay Load`) and bound imports may hide real IAT. Check DataDir entries 12/13.
+- Delay imports (`dumpbin /IMPORTS` shows `Delay Load`) and bound imports may hide real IAT. Check DataDir entries 11/12/13 (bound imports, IAT, delay imports).
 - Few imports + `LoadLibrary/GetProcAddress` = resolve dynamically at runtime (see `08-...` for `bu` breakpoints). Do not list "no network imports = no network".
 - DLL: check `dumpbin /EXPORTS` — missing exports on a DLL, or `DllMain` doing heavy work, is suspicious.
 
@@ -108,8 +108,8 @@ TLS callbacks and `DllMain` (`DLL_PROCESS_ATTACH`) execute before `main`. If pre
 ## 5. Resources, overlay, certs, Rich header
 
 - Resources (`.rsrc`): enumerate with `rz-bin -z` + `wrestool -l` (Linux) or Resource Hacker (GUI, avoid for CLI). Look for embedded PE (`MZ` inside), scripts, configs. Extract, hash, triage separately.
-- Overlay: `SizeOfImage`-beyond-EOF data = installer payload / second stage. Carve: `dd if=sample.exe bs=1 skip=<cert_or_section_end> of=overlay.bin`.
-- Authenticode: `osslsigncode verify sample.exe`, `Get-AuthenticodeSignature` (PS). Unsigned system-claimed binary, or valid sig with mismatched subject, both worth noting. Cert does not mean benign.
+- Overlay: bytes past the end of the last section's raw data (last `PointerToRawData + SizeOfRawData`, rounded up to `FileAlignment`) — the file tail no section maps. Installer payload / second stage. Carve: `dd if=sample.exe bs=1 skip=<section_end> of=overlay.bin`.
+- Authenticode: `osslsigncode verify -in sample.exe`, `Get-AuthenticodeSignature` (PS). Unsigned system-claimed binary, or valid sig with mismatched subject, both worth noting. Cert does not mean benign.
 - Rich header (XOR-obfuscated MSVC build metadata at DOS stub): parse with `pefile` (`pe.RICH_HEADER`) or `richprint`. Gives toolchain versions — useful for Go/Rust/MSVC disambiguation.
 - Debug dir: PDB path (`dumpbin /HEADERS | rg pdb`) leaks build host + version. Record it.
 

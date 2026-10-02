@@ -138,3 +138,7 @@ fdtget board.dtb /chosen bootargs     # field query when supported
 
 Round trips are rarely byte-identical (ordering/padding) — compare semantics.
 `reg` needs parent `#address-cells`/`#size-cells`; never assume u32 pairs.
+
+The inverse operation — taking these mapped layers apart, modifying one, and
+rebuilding each layer so a device or emulator accepts it — is
+`firmware-repack-modify.md`.

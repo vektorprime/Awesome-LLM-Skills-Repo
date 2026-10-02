@@ -56,6 +56,9 @@ def cmd_known(args) -> int:
         if kl <= 0 or kl > len(ks):
             continue
         reps = len(ks) // kl
+        if reps < 2:
+            print(f"  keylen={kl}: insufficient keystream to test (need >= 2*{kl}, have {len(ks)})")
+            continue
         ok = all(ks[i * kl:(i + 1) * kl] == ks[:kl] for i in range(1, reps))
         print(f"  keylen={kl}: repeats={ok} key={ks[:kl].hex(' ')}")
     print("confirm with 2+ independent plaintexts/offsets before declaring XOR")

@@ -146,11 +146,11 @@ FD 37 7A 58 5A 00     xz / LZMA2
 89 50 4E 47           PNG   FF D8 FF  JPEG   42 4D  BMP
 25 50 44 46           PDF   7F 45 4C 46  ELF   4D 5A  PE
 D0 CF 11 E0           OLE/CFB (old Office)   %!PS  PostScript
-D5 32 30 31 ("D201")  U-Boot legacy uImage (0x27051956 BE)
+27 05 19 56            U-Boot legacy uImage (0x27051956, stored big-endian)
 D0 0D FE ED           FIT / FDT (0xD00DFEED BE)
-70 30 37 30 ("0707")  CPIO (070701/070702 newc)
-1F 9E / 1F A0         old compress/LZH variants
-3A 5F 41 52 43 48     ("ARCH"? check) vendor headers — treat as lead
+30 37 30 37 30 31     CPIO newc ("070701"/"070702"; odc is "070707")
+1F 9D                 old compress (.Z); 1F 9E / 1F A0 LZW variants
+3A 5F 41 52 43 48     ":_ARCH" vendor container header — treat as lead
 ```
 
 Endianness flips magic (`hsqs` vs `sqsh`). Carve candidates with

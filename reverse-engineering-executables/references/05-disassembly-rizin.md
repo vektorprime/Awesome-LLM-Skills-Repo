@@ -6,7 +6,7 @@ Rizin-first. Radare2 (`r2`/`rabin2`) commands shown only as fallback — flags d
 
 ```bash
 rizin -e io.cache=true -A "$F"
-# batch (preferred for LLM: JSON out, no interactiveloat):
+# batch (preferred for LLM: JSON out, no interactive prompt):
 rizin -q -A -c 'aflj' "$F" > "$CASE/artifacts/static/functions.json"
 ```
 
@@ -26,7 +26,7 @@ pdf               # disassemble function
 pdc               # pseudo-decompile (built-in, lossy)
 ```
 
-r2 equivalents: `izz` (r2) ≈ `izzz` (rizin); `rabin2 -Ij` ≈ `rz-bin -Ij`.
+r2 equivalents: `iz` / `izz` / `izzz` (data-section / whole-binary / raw dump) exist in both rizin and radare2 with the same semantics; `rabin2` flags mirror `rz-bin` (`-z`, `-zz`, `-zzz`).
 
 ## 2. JSON-first batch (do this before reading asm)
 

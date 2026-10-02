@@ -22,8 +22,13 @@ print(f"CLR VA={hex(d.VirtualAddress)} Size={hex(d.Size)} -> {'DOTNET' if d.Size
 PY
 monodis --assembly "$F" 2>/dev/null | head -n 40
 ilspycmd "$F" -o "$CASE/artifacts/static/ilspy/" 2> "$OUT/ilspy.stderr" || dotnet-ildasm "$F" || true
-# dnfile for metadata without runtime:
-python3 -m dnfile "$F" 2>/dev/null | head -n 80 || pip show dnfile
+# dnfile for .NET metadata without any .NET runtime (library, no CLI):
+python3 - "$F" <<'PY' 2>/dev/null || pip show dnfile
+import sys
+import dnfile
+pe = dnfile.dnPE(sys.argv[1])
+print("dnfile CLR metadata parsed:", bool(pe.net))
+PY
 ```
 
 Rules:

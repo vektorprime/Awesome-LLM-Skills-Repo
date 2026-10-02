@@ -165,8 +165,8 @@ This separation is why there are two families of "less/greater" jumps (`jl`/`jg`
 x86-64 retains six 16-bit segment selectors: **`cs`, `ds`, `ss`, `es`, `fs`, `gs`**. Segmentation is largely disabled in 64-bit mode — `cs`, `ds`, `ss`, `es` are forced to a base of 0 and limit of 2⁶⁴−1 and are mostly ignored. Two remain important:
 
 - **`fs` and `gs`** — their **base addresses** are still honored and are used by operating systems and runtimes for per-thread / per-CPU data:
-  - On **Linux**, the kernel sets `gs` base (via the `arch_prctl(ARCH_SET_GS, …)` syscall or the `wrgsbase` instruction) to point at thread-local storage. The C library accesses TLS through `fs` (e.g., the stack canary lives at `fs:[0x28]` on x86-64 Linux).
-  - On **Windows**, the `gs` base points to the **TEB** (Thread Environment Block); e.g., `gs:[0x30]` is the PEB pointer, `gs:[0x8]` is the stack base.
+  - On **Linux** (x86-64), user programs reach thread-local storage through **`fs`**: the thread library sets the `fs` base (via `arch_prctl(ARCH_SET_FS, …)` or the `wrfsbase` instruction) to the thread pointer (TCB). The stack canary lives at `fs:[0x28]`. The `gs` base is typically unused (0) in user mode — the *kernel itself* uses `gs` for per-CPU data while in kernel mode.
+  - On **Windows**, the `gs` base points to the **TEB** (Thread Environment Block); e.g., `gs:[0x30]` is the TEB self-pointer, `gs:[0x60]` is the PEB pointer, `gs:[0x8]` is the stack base, `gs:[0x10]` is the stack limit.
 
 Segment overrides look like `mov rax, [gs:0x28]`. In 64-bit mode, only `fs` and `gs` overrides are meaningful; the others are either ignored or cause exceptions in certain cases.
 
@@ -331,7 +331,7 @@ Control registers configure CPU operation. They are privileged (ring 0) and acce
 |----------|---------|
 | `cr0` | Master control: PE (protected-mode enable), PG (paging), caching flags, WP (write-protect), etc. |
 | `cr2` | Holds the faulting linear address on a page fault. |
-| `cr3` | Page-table base: physical address of the PML4 (top-level paging structure) plus PCID/flags. Loaded on every context switch. |
+| `cr3` | Page-table base: physical address of the top-level paging structure (PML4, or PML5 with 5-level/LA57 paging) plus PCID/flags. Loaded on every context switch. |
 | `cr4` | Extension enables: PAE, SMEP, SMAP, UMIP, PCIDE, OSFXSR/OSXMMEXCPT (SSE), OSXSAVE (AVX), CET, etc. |
 | `cr8` | Task Priority Register (TPR) — controls interrupt priority (in 64-bit mode; replaces the APIC TPR access path). |
 
@@ -534,14 +534,14 @@ mov rax, [rsp + rdx*4 + 12]  ; full SIB form
 
 Special cases:
 - `[rsp]` and `[r12]` as a base force a SIB byte (the encoding uses `rsp` to signal "SIB follows").
-- There is **no** `[index*scale + disp]` without a base in the pure form — the assembler encodes it with a base of 0 via SIB.
+- `[index*scale + disp]` without a base **is** encodable: SIB with base field = 101 and mod = 00 means "no base register" + `disp32` (sign-extended to 64 bits, *not* RIP-relative — RIP-relative is selected by `r/m=101`, not via SIB).
 - **RIP-relative** cannot combine with index/scale; it is `[rip + disp32]` only.
 
 ---
 
 ## 20. Core Instructions
 
-### 19.1 Data movement
+### 20.1 Data movement
 ```asm
 mov   rax, 42             ; immediate → register
 mov   rax, rbx            ; register → register
@@ -558,7 +558,7 @@ movabs rax, 0x1122334455667788  ; full 64-bit immediate (only mov allows this)
 ```
 `movabs` is the only instruction that takes a full 64-bit immediate. `lea` is heavily used for arithmetic: `lea rax, [rax + rax*4]` computes `rax*5` in one instruction without touching flags.
 
-### 19.2 Arithmetic
+### 20.2 Arithmetic
 ```asm
 add  rax, rbx
 sub  rax, 1
@@ -576,7 +576,7 @@ cdq                       ; sign-extend eax → edx:eax
 ```
 Division uses the implicit 128-bit dividend `rdx:rax`. For signed division, run `cqo` first to sign-extend `rax` into `rdx`; for unsigned, zero `rdx` (`xor edx, edx`).
 
-### 19.3 Bitwise logic and shifts
+### 20.3 Bitwise logic and shifts
 ```asm
 and  rax, rbx
 or   rax, rbx
@@ -595,13 +595,13 @@ tzcnt / lzcnt             ; trailing / leading zero count (BMI1 / LZCNT)
 ```
 Shift counts come from an immediate or from `cl`.
 
-### 19.4 Compare and test
+### 20.4 Compare and test
 ```asm
 cmp  rax, rbx             ; set flags as if rax - rbx, discard result
 test rax, rax             ; set flags as if rax & rax (common zero/sign check)
 ```
 
-### 19.5 String operations
+### 20.5 String operations
 `movs`, `stos`, `lods`, `scas`, `cmps` operate on `[rsi]`/`[rdi]` and auto-increment/decrement per `DF`. Prefixed with `rep`/`repe`/`repne`. `rep stosb` with `al` is the classic memset; `rep movsb` is memcpy (enhanced "ERMS" makes this fast on modern CPUs). Use `cld` to clear `DF` (forward) — ABIs require `DF=0` on function entry.
 
 ---
@@ -689,7 +689,7 @@ ldd prog                     # shared-library dependencies
 
 ## 22. Control Flow
 
-### 20.1 Unconditional
+### 22.1 Unconditional
 ```asm
 jmp  label
 jmp  rax              ; indirect jump (computed target)
@@ -699,7 +699,7 @@ ret                   ; pop return address and jump to it
 ret  8                ; ret and add 8 to rsp (rare in 64-bit)
 ```
 
-### 20.2 Conditional jumps
+### 22.2 Conditional jumps
 
 | Instruction | Condition (flags) | Meaning |
 |-------------|-------------------|---------|
@@ -716,17 +716,19 @@ ret  8                ; ret and add 8 to rsp (rare in 64-bit)
 | `js` / `jns` | SF=1 / SF=0 | negative / non-negative |
 | `jo` / `jno` | OF=1 / OF=0 | overflow / no overflow |
 | `jp` / `jpe` | PF=1 | parity even |
-| `jcxz`/`jecxz`/`jrcxz` | rcx=0 | rcx is zero |
+| `jcxz` / `jecxz` | cx/ecx=0 | cx / ecx is zero |
 
-### 20.3 Conditional set and move (branchless)
+> There is **no `jrcxz`** in 64-bit mode: the `E3` opcode tests ECX only (JCXZ with a `0x67` address-size prefix). To branch on an empty `rcx`, use `test rcx, rcx` + `jz`.
+
+### 22.3 Conditional set and move (branchless)
 ```asm
 cmp    rax, rbx
 setl   al            ; al = 1 if rax < rbx (signed), else 0
-cmovl  rax, rbx      ; rax = rbx if rax < rbx  (branchless min)
+cmovl  rax, rbx      ; if rax < rbx, rax = rbx  (branchless max)
 ```
 `setcc` writes a 0/1 byte; `cmovcc` conditionally moves a full operand. Compilers favor these to avoid branch misprediction.
 
-### 20.4 Example: if/else
+### 22.4 Example: if/else
 ```asm
     cmp  rax, 0
     jne  .else
@@ -737,7 +739,7 @@ cmovl  rax, rbx      ; rax = rbx if rax < rbx  (branchless min)
 .end:
 ```
 
-### 20.5 Example: counted loop
+### 22.5 Example: counted loop
 ```asm
     xor  ecx, ecx        ; i = 0  (also zeroes rcx)
     xor  eax, eax        ; sum = 0
@@ -800,7 +802,7 @@ The **128 bytes below `rsp`** are a "red zone" that leaf functions may use freel
 
 ## 24. Calling Conventions
 
-### 22.1 System V AMD64 ABI (Linux, macOS, BSD, Solaris, illumos)
+### 24.1 System V AMD64 ABI (Linux, macOS, BSD, Solaris, illumos)
 
 **Integer/pointer arguments**, in order:
 ```
@@ -826,7 +828,7 @@ Example — `printf("x = %d\n", 42)`:
     call  printf wrt ..plt   ; (NASM ELF64 PIC form) or: call printf
 ```
 
-### 22.2 Microsoft x64 ABI (Windows)
+### 24.2 Microsoft x64 ABI (Windows)
 
 **Integer/pointer arguments**, in order:
 ```
@@ -844,7 +846,7 @@ rcx, rdx, r8, r9
 
 > **Key contrasts:** argument registers differ (`rdi,rsi,rdx,rcx,r8,r9` vs. `rcx,rdx,r8,r9`); Windows requires 32 bytes of shadow space and has no red zone; Windows preserves `rdi`/`rsi` and `xmm6`–`xmm15`.
 
-### 22.3 Complete function example (System V)
+### 24.3 Complete function example (System V)
 
 ```asm
 ; long add(long a, long b)   — a in rdi, b in rsi

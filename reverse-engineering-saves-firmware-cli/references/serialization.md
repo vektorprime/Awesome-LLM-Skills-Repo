@@ -51,8 +51,8 @@ alone.
 | Format | Tells | Confirm with |
 |---|---|---|
 | Protocol Buffers | varint tags, no global magic, small field numbers, LEN-delimited strings | `protoc --decode_raw < chunk` consumes all bytes plausibly |
-| MessagePack | type markers `0x80–0x9F` (fixmap), `0xA0–0xBF` (fixstr), `0x91–0x9F` arrays | `msgpack` lib round-trip of carved region |
-| CBOR | major-type high bits (`0x40`–`0x5B` text/bstr, `0xA0`+ maps) | `cbor2` decode, check trailing bytes == 0 |
+| MessagePack | fixmap `0x80–0x8F`, fixarray `0x90–0x9F`, fixstr `0xA0–0xBF` | `msgpack` lib round-trip of carved region |
+| CBOR | byte strings `0x40–0x5F`, text strings `0x60–0x7F`, maps `0xA0–0xBF` | `cbor2` decode, check trailing bytes == 0 |
 | BSON | LE doc length at 0, null-terminated keys, typed values, trailing `0x00` | `bson` decode; length == region len |
 | Java serialization | `AC ED 00 05` + class descriptors | `jdeserialize` / parser, not strings alone |
 | .NET BinaryFormatter | `00 01 00 00 00 FF FF FF FF` + assembly-qualified type names | type-name strings + formatter lib |

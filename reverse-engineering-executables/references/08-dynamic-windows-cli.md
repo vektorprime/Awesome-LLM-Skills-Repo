@@ -38,16 +38,18 @@ Scripted hits (save as `commands.txt`, preserve with case):
 .reload
 sxe av
 bu kernel32!CreateProcessW ".printf \"CreateProcessW hit\\n\"; k; dv; g"
-bu ws2_32!connect ".printf \"connect hit\\n\"; k; du poi(@rdx); g"
+bu ws2_32!connect ".printf \"connect hit\\n\"; k; db @rdx L16; g"
 g
 ```
+
+The `db @rdx L16` dump decodes as `sockaddr`: first 2 bytes = address family (`02 00` = AF_INET), next 2 = port in **network (big-endian) order**, next 4 = IPv4 address. `rdx` is the `sockaddr*` itself — dumping it as a string (`du`) yields garbage.
 
 Run with the installed CDB `-cf commands.txt` variant (check `cdb -h` — options drift). Save log + command file.
 
 ## 2. DLL specifics
 
 - `rundll32 sample.dll,Export arg` or `regsvr32 /s sample.dll` for DLL entry. Log exact command line — it changes `DllMain` path.
-- Break on `sample!DllMain` first; `DLL_PROCESS_ATTACH` reason is in 3rd arg (`r8d==1`).
+- Break on `sample!DllMain` first; `DLL_PROCESS_ATTACH` reason is in 2nd arg (`rdx==1` — `DllMain(hinst=rcx, reason=rdx, lpReserved=r8)`).
 - No exports on a DLL → loader still calls `DllMain`. Don't conclude "nothing to run".
 
 ## 3. ProcMon headless (file/reg/proc truth)
@@ -77,3 +79,7 @@ Distinguish 7 levels (each is a different claim): embedded string → DNS attemp
 - Which caller built args (stack trace → static function)?
 - Return value checked? (`test eax,eax / jz` nearby?)
 - Conditional on env/time/priv/args? Re-run with variants to prove.
+
+Breakpoints answer single hits; for systematic arg/buffer logging, per-run
+behavior changes, or hooking the unpacker: `12-hooking-windows.md`. For
+crash triage and turning observations into a proof: `13-exploitation-windows.md`.

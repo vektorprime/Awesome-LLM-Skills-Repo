@@ -1,11 +1,11 @@
 ---
 name: reverse-engineering-executables
-description: Reverse engineer Windows EXE/DLL and other native executables from the CLI - triage, PE static analysis, disassembly, debugging, unpacking, and reporting. Use when asked to analyze an executable, DLL, packed binary, or unknown binary that executes code.
+description: Reverse engineer Windows EXE/DLL and other native executables from the CLI - triage, PE static analysis, disassembly, debugging, unpacking, runtime hooking, authorized exploitation and PoC development, binary patching, and reporting. Use when asked to analyze an executable, DLL, packed binary, or unknown binary that executes code.
 ---
 
 # Reverse Engineering Executables (CLI-First)
 
-**Scope:** Authorized analysis of native executables, prioritizing Windows PE (EXE/DLL/SYS) with ELF/Mach-O appendix. For pure data/firmware/save formats with no code analysis, use `reverse-engineering-saves-firmware-cli` instead.
+**Scope:** Authorized analysis of native executables, prioritizing Windows PE (EXE/DLL/SYS) with ELF/Mach-O appendix — static through dynamic, plus runtime hooking, authorized-target exploitation (crash triage to working PoC), and persistent binary patching. For pure data/firmware/save formats with no code analysis, use `reverse-engineering-saves-firmware-cli` instead.
 **Operating principle:** Every conclusion must be traceable to a command, an artifact, and a confidence label (Observed / Inferred / Unknown + High/Medium/Low).
 
 ## Mandatory loop (every task)
@@ -39,16 +39,20 @@ Treat every unknown EXE as hostile. Disposable VM + snapshot + host-only/disable
 8. **Dynamic Windows:** `references/08-dynamic-windows-cli.md` — CDB/WinDbg, ProcMon, network sim, attempted-vs-successful. Requires execution gate.
 9. **Linux ELF appendix:** `references/09-dynamic-linux-appendix.md` — `strace`, GDB, `rr`, Frida. Only if target is ELF.
 10. **Packing/anti-analysis:** `references/10-packing-obfuscation-antianalysis.md` — UPX shortcut vs generic dump, API hashing, anti-debug catalog, when NOT to unpack.
-11. **Reporting:** `references/11-report-review-checklists.md` — report template, citation style, peer-review, escalation, close-out checklist.
+11. **Runtime hooking (Windows):** `references/12-hooking-windows.md` — Frida attach/spawn + `Interceptor`, Detours/MinHook logging DLLs, DLL injection, IAT hooks, VEH, ETW, hooking the unpacker. Read when breakpoints/ProcMon don't cover the question or you need to change behavior per-run.
+12. **Exploitation (authorized targets):** `references/13-exploitation-windows.md` — findings→vulnerability hypotheses, CDB crash triage + cyclic patterns, mitigation inventory, primitives (ROP/heap/UAF/format-string/OOB), ASLR-defeat menu, PoC discipline, fuzzing to feed it. Requires execution gate + authorization.
+13. **Persistent patching:** `references/14-binary-patching.md` — inline same-length patches, code caves, appended sections, data patches, rebuild obligations, DLL proxying. Read when behavior changes must survive across runs.
+14. **Reporting:** `references/11-report-review-checklists.md` — report template, citation style, peer-review, escalation, close-out checklist.
 
 Templates: `checklists/triage-summary-template.md`, `checklists/dynamic-test-plan-template.md`, `checklists/function-note-template.md`.
-Scripts: `scripts/triage.sh`, `scripts/triage-exe.ps1`, `scripts/entropy.py`, `scripts/ExportFunctions.py`.
+Scripts: `scripts/triage.sh`, `scripts/triage-exe.ps1`, `scripts/entropy.py`, `scripts/ExportFunctions.py`, `scripts/gdb-baseline.txt` (GDB batch baseline), `scripts/pattern.py` (cyclic pattern create/offset), `scripts/patch_bytes.py` (verified byte patch + ledger).
 
 ## Tool fallback order
 
 - PE info: `pefile/LIEF` (Python) > `rz-bin/rabin2` > `llvm-objdump` > `dumpbin` (Windows). If one loader misidentifies arch/base, confirm with a second engine.
 - Strings: `strings` + `FLOSS` + `rz-bin -z`. A string is a lead, never proof of behavior.
 - Capabilities: `capa` to prioritize, then verify at call site + runtime. Missing `capa` match proves nothing.
+- Gadgets (exploitation): `ROPgadget` + `ropper` as two engines; verify decisive gadget bytes yourself in `u <addr> L8` — gadget finders disagree on boundaries like decompilers do.
 - Entropy >7.5 is a clue (compression/encryption/media/random), never proof. Must align with section + decoder loop.
 
 ## Definition of done

@@ -121,7 +121,9 @@ Keyed/signed indicators: unkeyed hypotheses all fail; long high-entropy
 field; certs/keys in strings; manifest names an algorithm; edits never
 validate. Then: document the boundary, label it "unverified signature/MAC
 candidate", do NOT call it encryption, and escalate (see
-`automation-reporting.md`). Signature ≠ encryption.
+`automation-reporting.md`). Signature ≠ encryption. The
+classification→action ladder (recompute checksum → MAC key hunt in the
+client binary → what a signature actually enforces) is `save-exploitation.md`.
 
 ## 6. Journaling, redundancy, dual-slot saves
 
@@ -143,17 +145,17 @@ before editing either copy. Corrupt-slot recovery test belongs in the spec.
 
 ```bash
 cp baseline.bin candidate.bin
-python3 - candidate.bin 0x1234 999 <<'PY'
-from pathlib import Path
-import struct, sys
-p, off, val = Path(sys.argv[1]), int(sys.argv[2],0), int(sys.argv[3],0)
-d = bytearray(p.read_bytes())
-struct.pack_into("<I", d, off, val)
-p.write_bytes(d)
-PY
+python3 scripts/patch_int.py candidate.bin --offset 0x1234 --value 999 --width 4 --endian le
 sha256sum baseline.bin candidate.bin
 python3 scripts/diff_regions.py baseline.bin candidate.bin
 ```
+
+`scripts/patch_int.py` patches one integer field (width 1/2/4/8, le/be,
+signed, optional current-value guard) and hashes before/after — the
+inline `struct.pack_into` snippet above is the same operation for ad-hoc
+use. When the goal is making edits the loader will *accept* (integrity
+bypass, dependent recomputation, save-level triggers), that pipeline is
+specified in `save-exploitation.md`.
 
 Application acceptance is necessary but not sufficient — apps silently repair,
 ignore, or reset fields. Preservation rule: parse confirmed fields, pass

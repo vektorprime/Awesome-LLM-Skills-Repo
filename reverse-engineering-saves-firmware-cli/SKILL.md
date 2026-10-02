@@ -1,6 +1,6 @@
 ---
 name: reverse-engineering-saves-firmware-cli
-description: CLI-first reverse engineering of non-executable blobs — saved-game files, emulator savestates, firmware update packages, raw flash dumps, filesystem images, and opaque binary data. Use when asked to map binary structure, carve layers, recover fields by differential analysis, identify compression/checksums/encryption, extract firmware filesystems, or build a bounded parser with tests. Does NOT cover disassembly, decompilation, or exploit development.
+description: CLI-first reverse engineering of non-executable blobs — saved-game files, emulator savestates, firmware update packages, raw flash dumps, filesystem images, and opaque binary data. Use when asked to map binary structure, carve layers, recover fields by differential analysis, identify compression/checksums/encryption, extract firmware filesystems, exploit the format under authorization (integrity bypass, edit pipeline, save-level triggers), rebuild/repack firmware layers, or build a bounded parser with tests. Code-side loader analysis (disassembly, hooking, exploit development against the application) hands off to the reverse-engineering-executables skill. Does NOT cover signature bypass on deployed devices, malware analysis, or extracting content without authorization.
 ---
 
 # CLI-First Reverse Engineering of Saves, Savestates & Firmware (Non-EXE)
@@ -12,10 +12,15 @@ evidence package that a second engineer can reproduce without talking to you.
 > layers, field boundaries, encodings, integrity mechanisms, and transformation
 > steps **with evidence**.
 
-**Out of scope:** disassembling binaries found inside firmware, decompilation,
-debugger-based program analysis, bypassing signature verification on deployed
-devices, exploit development, malware analysis, extracting content without
-authorization.
+**Out of scope:** parser recovery from application code and anything
+code-side of the loader (disassembly, decompilation, hooking, exploit
+development against the application — hand off to the
+`reverse-engineering-executables` skill with exact hashes), bypassing
+signature verification on deployed devices, malware analysis, extracting
+content without authorization. Authorized save-level exploitation
+(integrity bypass, edit pipeline, save-trigger workups) is covered by
+`references/save-exploitation.md`; authorized lab-device firmware
+rebuild/repack is covered by `references/firmware-repack-modify.md`.
 
 ## How to use this skill (progressive disclosure)
 
@@ -75,6 +80,8 @@ reproduce the result from the package alone.
 | Firmware layers, provenance, binwalk/unblob, partitions, U-Boot/FIT, DTB | `references/firmware-containers.md` | `scripts/carve.py`, `templates/layer-ledger.md` |
 | SquashFS, UBI/UBIFS, JFFS2, CramFS, ext, FAT, CPIO, sparse, raw NAND/OOB | `references/filesystems-flash.md` | `scripts/nand_split.py`, `scripts/tree_manifest.py` |
 | Manifests, boot map, secrets, version-to-version diff | `references/firmware-analysis.md` | `checklists/firmware.md` |
+| Authorized save exploitation: loader attack surface, integrity ladder (checksum→MAC→signature), edit pipeline, save-level triggers, loader-bug handoff | `references/save-exploitation.md` | `scripts/patch_int.py`, `scripts/checksum_candidates.py` |
+| Authorized lab-device firmware rebuild: per-layer repack tools, recompute obligations, partition resize, QEMU-first testing ladder | `references/firmware-repack-modify.md` | `templates/layer-ledger.md`, `scripts/tree_manifest.py` |
 | Spec writing, bounded parser, Kaitai, tests, fuzz, safe rebuild | `references/parser-spec.md` | `scripts/reader.py`, `templates/spec-template.md` |
 | Playbooks, final checklist, peer review, report, escalation, command ref, training | `references/automation-reporting.md` | `checklists/*.md`, `templates/report-template.md` |
 
@@ -127,8 +134,9 @@ scripts/tlv_scan.py <file>                 # ASCII-tag + length walker (le+be)
 scripts/zlib_scan.py <file>                # validated zlib streams (offset, consumed, outlen)
 scripts/checksum_candidates.py <file> [off] [len]  # sums, CRCs, Adler, hashes over ranges
 scripts/xor_tools.py ...                   # single-byte brute force, repeating-key, known-plaintext
+scripts/patch_int.py FILE --offset O --value V --width 1|2|4|8 [--endian le|be] [--signed] [--expect-current N]
 scripts/find_hash.py STATE ROM             # MD5/SHA1/SHA256 binary+hex search (ROM identity)
-scripts/nand_split.py RAW PAGE OOB OUT     # test a page/OOB geometry hypothesis
+scripts/nand_split.py RAW PAGE OOB DATA_OUT [OOB_OUT]  # test a page/OOB geometry hypothesis
 scripts/tree_manifest.py ROOT              # JSONL manifest: type, mode, uid, size, sha256, link
 scripts/reader.py                          # importable bounded Reader (no CLI; use in your parser)
 scripts/sample_matrix_fill.py MATRIX.CSV SAMPLES_DIR

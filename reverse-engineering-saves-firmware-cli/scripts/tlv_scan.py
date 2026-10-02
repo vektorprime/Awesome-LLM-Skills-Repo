@@ -24,13 +24,13 @@ def main() -> int:
             continue
         le = struct.unpack_from("<I", data, off + 4)[0]
         be = struct.unpack_from(">I", data, off + 4)[0]
-        hit = None
+        hit, chosen = None, None
         if args.min_len <= le <= min(args.max_len, len(data) - off - 8):
-            hit = f"le_len=0x{le:x}"
+            hit, chosen = f"le_len=0x{le:x}", le
         elif args.min_len <= be <= min(args.max_len, len(data) - off - 8):
-            hit = f"be_len=0x{be:x}"
+            hit, chosen = f"be_len=0x{be:x}", be
         if hit:
-            print(f"0x{off:08x} tag={tag.decode()!r} {hit} next=0x{off+8+(le if 'le' in hit else be):x}")
+            print(f"0x{off:08x} tag={tag.decode()!r} {hit} next=0x{off+8+chosen:x}")
             shown += 1
             if shown >= args.max_hits:
                 print(f"... capped at {args.max_hits} hits; narrow the range")

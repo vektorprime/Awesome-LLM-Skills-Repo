@@ -16,7 +16,7 @@ def main() -> int:
     args = ap.parse_args()
     data = Path(args.path).read_bytes()
     found = 0
-    for off in range(len(data) - 2):
+    for off in range(max(len(data) - 1, 0)):
         cmf, flg = data[off], data[off + 1]
         if (cmf & 0x0F) != 8:
             continue

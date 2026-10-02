@@ -108,7 +108,7 @@ Red flags for EXE:
 ```bash
 capa -j "$F" > "$OUT/capa.json" 2> "$OUT/capa.stderr" || true
 capa "$F" | tee "$OUT/capa.txt" || true
-yara -r /path/to/approved/rules "$F" | tee "$OUT/yara.txt" || true
+yara /path/to/approved/rules "$F" | tee "$OUT/yara.txt" || true   # -r/--recursive only applies when scanning a directory
 ```
 
 Use capa to prioritize manual review. For each interesting match (`anti-debug`, `inject`, `persistence`), record ATT&CK + function address, then verify at call site. Log YARA ruleset commit.
